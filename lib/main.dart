@@ -1,122 +1,165 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
+import 'firebase_options.dart';
+import 'screens/login_screen.dart';
+import 'screens/formulario_screen.dart';
+import 'screens/historial_screen.dart';
+import 'user_model.dart';
 
-void main() {
-  runApp(const MyApp());
-}
+// VARIABLE GLOBAL
+const Color colorPrincipal = Color(0xFFF52784);
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+// --- FUNCIÓN DE IMPRESIÓN ACTUALIZADA (PUNTO 2 CORREGIDO) ---
+Future<void> funcionImprimirTicket(Map<String, dynamic> datos) async {
+  final pdf = pw.Document();
+  pdf.addPage(
+    pw.Page(
+      pageFormat: PdfPageFormat.roll80,
+      build: (pw.Context context) => pw.Padding(
+        padding: const pw.EdgeInsets.all(10),
+        child: pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Center(
+                child: pw.Text("XSIM - REGISTRO OFICIAL",
+                    style: pw.TextStyle(fontSize: 10))),
+            pw.Center(
+                child: pw.Text("ACTA N°: ${datos['nro_acta'] ?? 'S/N'}",
+                    style: pw.TextStyle(
+                        fontSize: 14, fontWeight: pw.FontWeight.bold))),
+            pw.Divider(),
+            pw.Text("Patente: ${datos['patente'] ?? '---'}"),
+            pw.Text(
+                "Vehículo: ${datos['marca'] ?? ''} ${datos['modelo'] ?? ''}"),
+            pw.Text(
+                "Dirección: ${datos['calle_ruta'] ?? ''} ${datos['nro_km'] ?? ''}"),
+            pw.Text("Infracción: ${datos['tipo_infraccion'] ?? 'General'}"),
+            pw.Text("Fecha: ${datos['fecha_str'] ?? '---'}"),
 
-  // This widget is the root of your application.
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Flutter Demo',
-      theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a purple toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-      ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
-    );
-  }
-}
+            // --- NUEVAS LÍNEAS PARA OBSERVACIONES Y COORDENADAS ---
+            pw.SizedBox(height: 5),
+            pw.Text("Observaciones:",
+                style:
+                    pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8)),
+            pw.Text("${datos['observaciones'] ?? 'SIN OBSERVACIONES'}",
+                style: pw.TextStyle(fontSize: 8)),
+            pw.SizedBox(height: 5),
+            pw.Text("Ubicación:",
+                style:
+                    pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8)),
+            pw.Text("${datos['ubicacion'] ?? 'S/D'}",
+                style: pw.TextStyle(fontSize: 7)),
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
-
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
-  final String title;
-
-  @override
-  State<MyHomePage> createState() => _MyHomePageState();
-}
-
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
-
-  void _incrementCounter() {
-    setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
-    return Scaffold(
-      appBar: AppBar(
-        // TRY THIS: Try changing the color here to a specific color (to
-        // Colors.amber, perhaps?) and trigger a hot reload to see the AppBar
-        // change color while the other colors stay the same.
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
-      ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
-        child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          //
-          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
-          // action in the IDE, or press "p" in the console), to see the
-          // wireframe for each widget.
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            const Text('You have pushed the button this many times:'),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
+            pw.Divider(),
+            pw.Text("Agente: ${datos['agente_nombre'] ?? 'S/D'}"),
+            pw.Text("Proyecto: ${datos['proyecto_id'] ?? '---'}"),
+            pw.Divider(),
+            pw.Center(
+                child: pw.Text("Comprobante Digital",
+                    style: pw.TextStyle(fontSize: 8))),
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
-      ), // This trailing comma makes auto-formatting nicer for build methods.
+    ),
+  );
+  await Printing.layoutPdf(onLayout: (format) async => pdf.save());
+}
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  try {
+    await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform);
+  } catch (e) {
+    debugPrint("Error Firebase: $e");
+  }
+  runApp(const XSimApp());
+}
+
+class XSimApp extends StatefulWidget {
+  const XSimApp({super.key});
+  @override
+  State<XSimApp> createState() => _XSimAppState();
+}
+
+class _XSimAppState extends State<XSimApp> {
+  bool _esModoOscuro = true;
+  int _indiceActual = 0;
+  DatosUsuario? _usuarioSesion;
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      themeMode: _esModoOscuro ? ThemeMode.dark : ThemeMode.light,
+      theme: ThemeData(
+          useMaterial3: true,
+          colorScheme: ColorScheme.fromSeed(seedColor: colorPrincipal),
+          inputDecorationTheme: const InputDecorationTheme(
+              floatingLabelBehavior: FloatingLabelBehavior.always)),
+      darkTheme: ThemeData(
+          useMaterial3: true,
+          brightness: Brightness.dark,
+          colorScheme: ColorScheme.fromSeed(
+              seedColor: colorPrincipal, brightness: Brightness.dark),
+          scaffoldBackgroundColor: const Color(0xFF0D0D0D),
+          inputDecorationTheme: const InputDecorationTheme(
+              floatingLabelBehavior: FloatingLabelBehavior.always)),
+      home: _usuarioSesion == null
+          ? LoginScreen(
+              esModoOscuro: _esModoOscuro,
+              onCambiarTema: () =>
+                  setState(() => _esModoOscuro = !_esModoOscuro),
+              onLoginSuccess: (user) => setState(() => _usuarioSesion = user),
+            )
+          : Scaffold(
+              appBar: AppBar(
+                backgroundColor: _esModoOscuro ? Colors.black : colorPrincipal,
+                foregroundColor: Colors.white,
+                leading: IconButton(
+                    icon: const Icon(Icons.logout),
+                    onPressed: () => setState(() => _usuarioSesion = null)),
+                title: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(_usuarioSesion!.nombre.toUpperCase(),
+                        style: const TextStyle(
+                            fontSize: 14, fontWeight: FontWeight.bold)),
+                    Text(
+                        "${_usuarioSesion!.rol} - ${_usuarioSesion!.proyectoId.toUpperCase()}",
+                        style: const TextStyle(
+                            fontSize: 10, color: Colors.white70)),
+                  ],
+                ),
+                actions: [
+                  IconButton(
+                      icon: Icon(
+                          _esModoOscuro ? Icons.light_mode : Icons.dark_mode),
+                      onPressed: () =>
+                          setState(() => _esModoOscuro = !_esModoOscuro)),
+                ],
+              ),
+              body: IndexedStack(
+                index: _indiceActual,
+                children: [
+                  FormularioScreen(usuario: _usuarioSesion!),
+                  HistorialScreen(usuario: _usuarioSesion!),
+                ],
+              ),
+              bottomNavigationBar: NavigationBar(
+                selectedIndex: _indiceActual,
+                onDestinationSelected: (i) => setState(() => _indiceActual = i),
+                destinations: const [
+                  NavigationDestination(
+                      icon: Icon(Icons.add_circle_outline), label: 'Registrar'),
+                  NavigationDestination(
+                      icon: Icon(Icons.history), label: 'Historial'),
+                ],
+              ),
+            ),
     );
   }
 }
