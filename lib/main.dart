@@ -90,6 +90,15 @@ class _XSimAppState extends State<XSimApp> {
   int _indiceActual = 0;
   DatosUsuario? _usuarioSesion;
 
+  // CONTROLADOR PARA EL DESPLAZAMIENTO LATERAL
+  final PageController _pageController = PageController();
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -142,8 +151,13 @@ class _XSimAppState extends State<XSimApp> {
                           setState(() => _esModoOscuro = !_esModoOscuro)),
                 ],
               ),
-              body: IndexedStack(
-                index: _indiceActual,
+              // CAMBIO AQUÍ: PageView permite el desplazamiento con el dedo
+              body: PageView(
+                controller: _pageController,
+                onPageChanged: (index) {
+                  // Sincroniza la barra inferior cuando deslizas con el dedo
+                  setState(() => _indiceActual = index);
+                },
                 children: [
                   FormularioScreen(usuario: _usuarioSesion!),
                   HistorialScreen(usuario: _usuarioSesion!),
@@ -151,7 +165,15 @@ class _XSimAppState extends State<XSimApp> {
               ),
               bottomNavigationBar: NavigationBar(
                 selectedIndex: _indiceActual,
-                onDestinationSelected: (i) => setState(() => _indiceActual = i),
+                onDestinationSelected: (i) {
+                  setState(() => _indiceActual = i);
+                  // Mueve la pantalla suavemente cuando tocas un botón
+                  _pageController.animateToPage(
+                    i,
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeInOut,
+                  );
+                },
                 destinations: const [
                   NavigationDestination(
                       icon: Icon(Icons.add_circle_outline), label: 'Registrar'),
