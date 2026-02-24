@@ -27,14 +27,19 @@ class _FormularioScreenState extends State<FormularioScreen> {
   final _alturaCtrl = TextEditingController();
   final _obsCtrl = TextEditingController();
 
-  // Controladores específicos para los Autocomplete (Para poder limpiarlos)
+  // Controladores y FocusNodes específicos para los Autocomplete (CORRECCIÓN DE ERROR)
   final TextEditingController _autoMarcaCtrl = TextEditingController();
   final TextEditingController _autoModeloCtrl = TextEditingController();
+  final FocusNode _focusMarca = FocusNode();
+  final FocusNode _focusModelo = FocusNode();
 
   String? _tipoInfraccionSeleccionada;
   File? _fotoPatente;
   File? _fotoContexto;
-  String _coordenadas = "BUSCANDO UBICACIÓN...";
+
+  // Variables para control de GPS Manual
+  String _coordenadas = "SIN CAPTURAR";
+  bool _obteniendoGPS = false;
   bool _cargando = false;
 
   final List<String> _opcionesInfraccion = [
@@ -48,12 +53,6 @@ class _FormularioScreenState extends State<FormularioScreen> {
   ];
 
   @override
-  void initState() {
-    super.initState();
-    _iniciarSeguimientoGPS();
-  }
-
-  @override
   void dispose() {
     _patenteCtrl.dispose();
     _marcaCtrl.dispose();
@@ -63,28 +62,52 @@ class _FormularioScreenState extends State<FormularioScreen> {
     _obsCtrl.dispose();
     _autoMarcaCtrl.dispose();
     _autoModeloCtrl.dispose();
+    _focusMarca.dispose(); // Importante liberar los FocusNodes
+    _focusModelo.dispose();
     super.dispose();
   }
 
-  void _iniciarSeguimientoGPS() async {
-    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      if (mounted) setState(() => _coordenadas = "GPS DESACTIVADO");
-      return;
-    }
-    LocationPermission permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-    }
-    Geolocator.getPositionStream(
-            locationSettings: const LocationSettings(
-                accuracy: LocationAccuracy.high, distanceFilter: 10))
-        .listen((Position position) {
-      if (mounted) {
-        setState(
-            () => _coordenadas = "${position.latitude}, ${position.longitude}");
-      }
+  // Función para capturar GPS a demanda
+  Future<void> _obtenerUbicacionManual() async {
+    setState(() {
+      _obteniendoGPS = true;
+      _coordenadas = "BUSCANDO SEÑAL...";
     });
+
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        setState(() => _coordenadas = "GPS DESACTIVADO");
+        _obteniendoGPS = false;
+        return;
+      }
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          setState(() => _coordenadas = "PERMISO DENEGADO");
+          _obteniendoGPS = false;
+          return;
+        }
+      }
+
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 12),
+      );
+
+      setState(() {
+        _coordenadas = "${position.latitude}, ${position.longitude}";
+        _obteniendoGPS = false;
+      });
+    } catch (e) {
+      setState(() {
+        _coordenadas = "ERROR DE SEÑAL";
+        _obteniendoGPS = false;
+      });
+      _mostrarMensaje("ERROR: REINTENTE EN UN LUGAR ABIERTO");
+    }
   }
 
   Future<void> _tomarFoto(bool esPatente) async {
@@ -107,15 +130,15 @@ class _FormularioScreenState extends State<FormularioScreen> {
 
   Future<void> _guardar() async {
     if (_patenteCtrl.text.trim().length < 6) {
-      _mostrarMensaje("LA PATENTE DEBE TENER AL MENOS 6 CARACTERES");
+      _mostrarMensaje("PATENTE INVÁLIDA");
       return;
     }
-    if (_calleCtrl.text.isEmpty || _tipoInfraccionSeleccionada == null) {
-      _mostrarMensaje("FALTA CALLE O TIPO DE INFRACCIÓN");
+    if (_coordenadas == "SIN CAPTURAR" || _coordenadas.contains("ERROR")) {
+      _mostrarMensaje("DEBE CAPTURAR EL GPS PRIMERO");
       return;
     }
     if (_fotoPatente == null) {
-      _mostrarMensaje("DEBE TOMAR AL MENOS LA FOTO DE LA PATENTE");
+      _mostrarMensaje("FALTA FOTO DE PATENTE");
       return;
     }
 
@@ -169,45 +192,55 @@ class _FormularioScreenState extends State<FormularioScreen> {
 
       await docRef.set(datos);
 
-      // Ejecutar impresión ANTES de limpiar para que no se pierdan los datos en el ticket
-      funcionImprimirTicket(datos);
-
-      _limpiarFormulario();
-
       if (mounted) {
-        _mostrarDialogoExito();
+        _mostrarDialogoExito(datos);
       }
+      _limpiarFormulario();
     } catch (e) {
-      _mostrarMensaje("ERROR AL GUARDAR: $e");
+      _mostrarMensaje("ERROR: $e");
     } finally {
       if (mounted) setState(() => _cargando = false);
     }
   }
 
-  void _mostrarDialogoExito() {
+  void _mostrarDialogoExito(Map<String, dynamic> d) {
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-        title: const Column(
-          children: [
-            Icon(Icons.check_circle, color: Colors.green, size: 60),
-            SizedBox(height: 10),
-            Text("¡ÉXITO!", style: TextStyle(fontWeight: FontWeight.bold)),
-          ],
-        ),
-        content: const Text(
-            "El acta ha sido registrada e impresa correctamente.",
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Icon(Icons.check_circle, color: Colors.green, size: 60),
+        content: const Text("ACTA REGISTRADA\n¿Cómo desea entregarla?",
             textAlign: TextAlign.center),
         actions: [
-          Center(
-            child: ElevatedButton(
-              onPressed: () => Navigator.pop(context),
-              style: ElevatedButton.styleFrom(backgroundColor: colorPrincipal),
-              child: const Text("CONTINUAR",
-                  style: TextStyle(color: Colors.white)),
-            ),
+          Column(
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  ElevatedButton.icon(
+                    onPressed: () => funcionCompartirWhatsapp(d),
+                    icon: const Icon(Icons.share),
+                    label: const Text("WHATSAPP"),
+                    style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        foregroundColor: Colors.white),
+                  ),
+                  ElevatedButton.icon(
+                    onPressed: () => funcionImprimirTicket(d),
+                    icon: const Icon(Icons.print),
+                    label: const Text("TICKET"),
+                    style: ElevatedButton.styleFrom(
+                        backgroundColor: colorPrincipal,
+                        foregroundColor: Colors.white),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text("CERRAR")),
+            ],
           )
         ],
       ),
@@ -221,15 +254,13 @@ class _FormularioScreenState extends State<FormularioScreen> {
     _calleCtrl.clear();
     _alturaCtrl.clear();
     _obsCtrl.clear();
-
-    // LIMPIEZA CLAVE: Resetear controladores de los autocompletes
     _autoMarcaCtrl.clear();
     _autoModeloCtrl.clear();
-
     setState(() {
       _fotoPatente = null;
       _fotoContexto = null;
       _tipoInfraccionSeleccionada = null;
+      _coordenadas = "SIN CAPTURAR";
     });
   }
 
@@ -243,17 +274,16 @@ class _FormularioScreenState extends State<FormularioScreen> {
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
       child: SingleChildScrollView(
-        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
             _buildInput(_patenteCtrl, "PATENTE / DOMINIO", Icons.badge),
             const SizedBox(height: 15),
-            _buildAutocomplete(_marcaCtrl, _autoMarcaCtrl, "MARCA",
+            _buildAutocomplete(_marcaCtrl, _autoMarcaCtrl, _focusMarca, "MARCA",
                 Icons.directions_car, ListasAutocompletado.marcas),
             const SizedBox(height: 15),
-            _buildAutocomplete(_modeloCtrl, _autoModeloCtrl, "MODELO",
-                Icons.model_training, ListasAutocompletado.modelos),
+            _buildAutocomplete(_modeloCtrl, _autoModeloCtrl, _focusModelo,
+                "MODELO", Icons.model_training, ListasAutocompletado.modelos),
             const SizedBox(height: 15),
             Row(
               children: [
@@ -310,7 +340,7 @@ class _FormularioScreenState extends State<FormularioScreen> {
                         minimumSize: const Size(double.infinity, 60),
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(15))),
-                    child: const Text("PROCESAR E IMPRIMIR",
+                    child: const Text("REGISTRAR INFRACCIÓN",
                         style: TextStyle(
                             color: Colors.white, fontWeight: FontWeight.bold)),
                   ),
@@ -321,18 +351,34 @@ class _FormularioScreenState extends State<FormularioScreen> {
   }
 
   Widget _buildGPSBanner() {
+    bool tieneCoordenadas = _coordenadas.contains(",");
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-          color: Colors.grey.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(10)),
+          color: tieneCoordenadas
+              ? Colors.green.withOpacity(0.1)
+              : Colors.orange.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+              color: tieneCoordenadas
+                  ? Colors.green
+                  : Colors.orange.withOpacity(0.5))),
       child: Row(children: [
-        const Icon(Icons.location_on, color: colorPrincipal, size: 20),
+        Icon(Icons.location_on,
+            color: tieneCoordenadas ? Colors.green : Colors.orange),
         const SizedBox(width: 10),
         Expanded(
             child: Text("COORDENADAS: $_coordenadas",
                 style: const TextStyle(
-                    fontSize: 10, fontWeight: FontWeight.bold))),
+                    fontSize: 11, fontWeight: FontWeight.bold))),
+        _obteniendoGPS
+            ? const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2))
+            : IconButton(
+                icon: const Icon(Icons.refresh, color: colorPrincipal),
+                onPressed: _obtenerUbicacionManual)
       ]),
     );
   }
@@ -340,11 +386,13 @@ class _FormularioScreenState extends State<FormularioScreen> {
   Widget _buildAutocomplete(
       TextEditingController mainCtrl,
       TextEditingController autoCtrl,
+      FocusNode focus,
       String label,
       IconData icon,
       List<String> opciones) {
     return RawAutocomplete<String>(
       textEditingController: autoCtrl,
+      focusNode: focus, // CORRECCIÓN: Vinculamos el FocusNode aquí
       optionsBuilder: (val) => val.text.isEmpty
           ? const Iterable<String>.empty()
           : opciones.where((o) => o.contains(val.text.toUpperCase())),
@@ -352,18 +400,16 @@ class _FormularioScreenState extends State<FormularioScreen> {
         autoCtrl.text = sel;
         mainCtrl.text = sel;
       },
-      fieldViewBuilder: (ctx, fCtrl, fNode, onSub) {
-        return TextField(
-          controller: fCtrl,
-          focusNode: fNode,
-          inputFormatters: [UpperCaseTextFormatter()],
-          onChanged: (val) => mainCtrl.text = val,
-          decoration: InputDecoration(
-              labelText: label,
-              prefixIcon: Icon(icon, color: colorPrincipal),
-              border: const OutlineInputBorder()),
-        );
-      },
+      fieldViewBuilder: (ctx, fCtrl, fNode, onSub) => TextField(
+        controller: fCtrl,
+        focusNode: fNode,
+        inputFormatters: [UpperCaseTextFormatter()],
+        onChanged: (val) => mainCtrl.text = val,
+        decoration: InputDecoration(
+            labelText: label,
+            prefixIcon: Icon(icon, color: colorPrincipal),
+            border: const OutlineInputBorder()),
+      ),
       optionsViewBuilder: (ctx, onSel, opts) => Align(
         alignment: Alignment.topLeft,
         child: Material(
@@ -401,8 +447,7 @@ class _FormularioScreenState extends State<FormularioScreen> {
         height: 100,
         decoration: BoxDecoration(
             color: Colors.grey.withOpacity(0.2),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: Colors.grey.withOpacity(0.1))),
+            borderRadius: BorderRadius.circular(10)),
         child: img == null
             ? Column(mainAxisAlignment: MainAxisAlignment.center, children: [
                 const Icon(Icons.camera_alt, color: Colors.grey),

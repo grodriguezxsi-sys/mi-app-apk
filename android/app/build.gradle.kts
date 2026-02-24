@@ -47,6 +47,15 @@ android {
             isShrinkResources = false
         }
     }
+
+    // --- BLOQUE AGREGADO PARA CAMBIAR EL NOMBRE DEL APK ---
+    applicationVariants.all {
+        val variant = this
+        variant.outputs.all {
+            val output = this as com.android.build.gradle.internal.api.ApkVariantOutputImpl
+            output.outputFileName = "XSIM-v${variant.versionName}.apk"
+        }
+    }
 }
 
 flutter {

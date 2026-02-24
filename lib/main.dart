@@ -1,8 +1,12 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
+
 import 'firebase_options.dart';
 import 'screens/login_screen.dart';
 import 'screens/formulario_screen.dart';
@@ -12,7 +16,7 @@ import 'user_model.dart';
 // VARIABLE GLOBAL
 const Color colorPrincipal = Color(0xFFF52784);
 
-// --- FUNCIÓN DE IMPRESIÓN ACTUALIZADA (PUNTO 2 CORREGIDO) ---
+// --- FUNCIÓN 1: IMPRIMIR TICKET (TÉRMICA O PDF) ---
 Future<void> funcionImprimirTicket(Map<String, dynamic> datos) async {
   final pdf = pw.Document();
   pdf.addPage(
@@ -38,8 +42,6 @@ Future<void> funcionImprimirTicket(Map<String, dynamic> datos) async {
                 "Dirección: ${datos['calle_ruta'] ?? ''} ${datos['nro_km'] ?? ''}"),
             pw.Text("Infracción: ${datos['tipo_infraccion'] ?? 'General'}"),
             pw.Text("Fecha: ${datos['fecha_str'] ?? '---'}"),
-
-            // --- NUEVAS LÍNEAS PARA OBSERVACIONES Y COORDENADAS ---
             pw.SizedBox(height: 5),
             pw.Text("Observaciones:",
                 style:
@@ -52,13 +54,12 @@ Future<void> funcionImprimirTicket(Map<String, dynamic> datos) async {
                     pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8)),
             pw.Text("${datos['ubicacion'] ?? 'S/D'}",
                 style: pw.TextStyle(fontSize: 7)),
-
             pw.Divider(),
             pw.Text("Agente: ${datos['agente_nombre'] ?? 'S/D'}"),
             pw.Text("Proyecto: ${datos['proyecto_id'] ?? '---'}"),
             pw.Divider(),
             pw.Center(
-                child: pw.Text("Comprobante Digital",
+                child: pw.Text("Comprobante Oficial",
                     style: pw.TextStyle(fontSize: 8))),
           ],
         ),
@@ -66,6 +67,100 @@ Future<void> funcionImprimirTicket(Map<String, dynamic> datos) async {
     ),
   );
   await Printing.layoutPdf(onLayout: (format) async => pdf.save());
+}
+
+// --- FUNCIÓN 2: COMPARTIR POR WHATSAPP (PDF ADJUNTO) ---
+Future<void> funcionCompartirWhatsapp(Map<String, dynamic> datos) async {
+  final pdf = pw.Document();
+
+  // Agregamos el contenido del PDF para WhatsApp
+  pdf.addPage(
+    pw.Page(
+      pageFormat:
+          PdfPageFormat.a4, // Para WhatsApp mejor A4 para que sea legible
+      build: (pw.Context context) => pw.Container(
+        padding: const pw.EdgeInsets.all(30),
+        child: pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Text("XSIM - COMPROBANTE DIGITAL",
+                    style:
+                        pw.TextStyle(fontSize: 10, color: PdfColors.grey700)),
+                pw.Text(datos['fecha_str'] ?? '',
+                    style: const pw.TextStyle(fontSize: 10)),
+              ],
+            ),
+            pw.SizedBox(height: 20),
+            pw.Text("ACTA DE INFRACCIÓN",
+                style:
+                    pw.TextStyle(fontSize: 22, fontWeight: pw.FontWeight.bold)),
+            pw.Text("N° REGISTRO: ${datos['nro_acta'] ?? 'S/N'}",
+                style: pw.TextStyle(fontSize: 14, color: PdfColors.pink700)),
+            pw.Divider(thickness: 2, color: PdfColors.pink),
+            pw.SizedBox(height: 20),
+
+            // Datos del Vehículo
+            pw.Text("DATOS DEL VEHÍCULO",
+                style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+            pw.Bullet(text: "DOMINIO/PATENTE: ${datos['patente']}"),
+            pw.Bullet(
+                text: "MARCA/MODELO: ${datos['marca']} ${datos['modelo']}"),
+            pw.SizedBox(height: 15),
+
+            // Datos de la Infracción
+            pw.Text("DETALLES DEL HECHO",
+                style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+            pw.Bullet(text: "INFRACCIÓN: ${datos['tipo_infraccion']}"),
+            pw.Bullet(text: "LUGAR: ${datos['calle_ruta']} ${datos['nro_km']}"),
+            pw.Bullet(text: "COORDENADAS: ${datos['ubicacion']}"),
+            pw.SizedBox(height: 15),
+
+            pw.Text("OBSERVACIONES:",
+                style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+            pw.Container(
+              padding: const pw.EdgeInsets.all(10),
+              decoration: pw.BoxDecoration(
+                  border: pw.Border.all(color: PdfColors.grey300)),
+              child: pw.Text(
+                  datos['observaciones'] ?? 'SIN OBSERVACIONES EXTRAS.',
+                  style: const pw.TextStyle(fontSize: 10)),
+            ),
+
+            pw.Spacer(),
+            pw.Divider(),
+            pw.Center(
+              child: pw.Text(
+                  "Este documento sirve como comprobante digital de la infracción registrada.",
+                  style: pw.TextStyle(fontSize: 9, color: PdfColors.grey600)),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+
+  try {
+    // 1. Obtener directorio temporal
+    final dir = await getTemporaryDirectory();
+    final String nombreArchivo =
+        "Acta_${datos['patente']}_${datos['nro_acta']}.pdf";
+    final file = File("${dir.path}/$nombreArchivo");
+
+    // 2. Guardar el archivo
+    await file.writeAsBytes(await pdf.save());
+
+    // 3. Compartir (Se abrirá el selector de apps, incluyendo WhatsApp)
+    await Share.shareXFiles(
+      [XFile(file.path)],
+      text:
+          'Se adjunta comprobante de acta N° ${datos['nro_acta']} para la patente ${datos['patente']}.',
+    );
+  } catch (e) {
+    debugPrint("Error al compartir: $e");
+  }
 }
 
 void main() async {
@@ -90,7 +185,6 @@ class _XSimAppState extends State<XSimApp> {
   int _indiceActual = 0;
   DatosUsuario? _usuarioSesion;
 
-  // CONTROLADOR PARA EL DESPLAZAMIENTO LATERAL
   final PageController _pageController = PageController();
 
   @override
@@ -151,11 +245,9 @@ class _XSimAppState extends State<XSimApp> {
                           setState(() => _esModoOscuro = !_esModoOscuro)),
                 ],
               ),
-              // CAMBIO AQUÍ: PageView permite el desplazamiento con el dedo
               body: PageView(
                 controller: _pageController,
                 onPageChanged: (index) {
-                  // Sincroniza la barra inferior cuando deslizas con el dedo
                   setState(() => _indiceActual = index);
                 },
                 children: [
@@ -167,7 +259,6 @@ class _XSimAppState extends State<XSimApp> {
                 selectedIndex: _indiceActual,
                 onDestinationSelected: (i) {
                   setState(() => _indiceActual = i);
-                  // Mueve la pantalla suavemente cuando tocas un botón
                   _pageController.animateToPage(
                     i,
                     duration: const Duration(milliseconds: 300),

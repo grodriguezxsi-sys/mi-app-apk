@@ -100,13 +100,24 @@ class HistorialScreen extends StatelessWidget {
                 Text("DETALLE DE ACTA",
                     style: TextStyle(
                         color: colorPrincipal, fontWeight: FontWeight.bold)),
-                IconButton(
-                    icon: const Icon(Icons.print),
-                    onPressed: () => funcionImprimirTicket(d)),
+                Row(
+                  children: [
+                    // --- NUEVO BOTÓN PARA WHATSAPP ---
+                    IconButton(
+                      icon: const Icon(Icons.share, color: Colors.green),
+                      tooltip: "Compartir por WhatsApp",
+                      onPressed: () => funcionCompartirWhatsapp(d),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.print),
+                      tooltip: "Imprimir Ticket",
+                      onPressed: () => funcionImprimirTicket(d),
+                    ),
+                  ],
+                ),
               ],
             ),
             const Divider(),
-            // --- CORRECCIÓN: MOSTRAR NÚMERO DE ACTA ---
             _infoRow("NRO ACTA", d['nro_acta']),
             _infoRow("PATENTE", d['patente']),
             _infoRow("DIRECCIÓN",
@@ -115,7 +126,6 @@ class HistorialScreen extends StatelessWidget {
             _infoRow("INFRACCIÓN", d['tipo_infraccion']),
             _infoRow("FECHA", d['fecha_str']),
             _infoRow("AGENTE", d['agente_nombre']),
-            // --- CORRECCIÓN: MOSTRAR OBSERVACIONES ---
             _infoRow("OBSERVACIONES", d['observaciones']),
             _infoRow("COORDENADAS", d['ubicacion']),
             const SizedBox(height: 20),
@@ -136,8 +146,7 @@ class HistorialScreen extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 5),
       child: Row(
-        crossAxisAlignment:
-            CrossAxisAlignment.start, // Para que las obs largas no se rompan
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
             width: 100,
