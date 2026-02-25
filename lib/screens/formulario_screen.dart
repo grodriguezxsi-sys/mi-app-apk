@@ -299,7 +299,7 @@ class _FormularioScreenState extends State<FormularioScreen> {
             ),
             const SizedBox(height: 15),
             DropdownButtonFormField<String>(
-              value: _tipoInfraccionSeleccionada,
+              initialValue: _tipoInfraccionSeleccionada,
               decoration: const InputDecoration(
                   labelText: "TIPO DE INFRACCIÓN",
                   border: OutlineInputBorder(),
