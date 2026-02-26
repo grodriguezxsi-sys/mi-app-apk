@@ -56,7 +56,7 @@ class _LoginScreenState extends State<LoginScreen> {
           uid: uid,
           nombre: datos['nombre'] ?? "Agente",
           rol: datos['rol'] ?? "Inspector",
-          proyectoId: datos['proyecto_id'] ?? "general",
+          localidadId: datos['localidad_id'] ?? "general",
         );
 
         widget.onLoginSuccess(usuarioActivo);
@@ -128,7 +128,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       border: Border.all(color: fucsiaXsim, width: 2),
                       boxShadow: [
                         BoxShadow(
-                            color: fucsiaXsim.withOpacity(0.4), blurRadius: 25)
+                            color: fucsiaXsim.withAlpha(102), blurRadius: 25) // Corregido
                       ],
                     ),
                     child: Icon(Icons.shield_outlined,
@@ -178,7 +178,7 @@ class _LoginScreenState extends State<LoginScreen> {
     return Container(
       decoration: BoxDecoration(
         color: widget.esModoOscuro
-            ? Colors.white.withOpacity(0.05)
+            ? Colors.white.withAlpha(13) // Corregido
             : Colors.grey[200],
         borderRadius: BorderRadius.circular(15),
       ),

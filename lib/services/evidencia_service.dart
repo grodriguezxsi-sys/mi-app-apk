@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'dart:developer' as developer;
 
 class EvidenciaService {
   final FirebaseStorage _storage = FirebaseStorage.instance;
@@ -29,8 +30,8 @@ class EvidenciaService {
         'foto_patente': urlPatente,
         'foto_contexto': urlContexto,
       };
-    } catch (e) {
-      print('Error al subir evidencias: $e');
+    } catch (e, s) {
+      developer.log('Error al subir evidencias: $e', name: 'evidencia_service', error: e, stackTrace: s);
       rethrow;
     }
   }

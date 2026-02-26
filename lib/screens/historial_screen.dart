@@ -12,7 +12,7 @@ class HistorialScreen extends StatelessWidget {
     return StreamBuilder(
       stream: FirebaseFirestore.instance
           .collection('infracciones')
-          .where('proyecto_id', isEqualTo: usuario.proyectoId.toUpperCase())
+          .where('localidad_id', isEqualTo: usuario.localidadId.toUpperCase())
           .orderBy('fecha', descending: true)
           .snapshots(),
       builder: (context, AsyncSnapshot<QuerySnapshot> snapshot) {
@@ -44,7 +44,7 @@ class HistorialScreen extends StatelessWidget {
                     style: const TextStyle(
                         fontWeight: FontWeight.bold, fontSize: 13)),
                 subtitle:
-                    Text("${d['patente'] ?? 'S/D'} - ${d['fecha_str'] ?? ''}"),
+                    Text("${d['patente'] ?? 'S/D'} - ${d['localidad_id'] ?? 'S/L'} - ${d['fecha_str'] ?? ''}"),
                 trailing: const Icon(Icons.chevron_right, size: 18),
               ),
             );
@@ -59,7 +59,7 @@ class HistorialScreen extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
-          color: Colors.grey.withOpacity(0.1),
+          color: Colors.grey.withAlpha(26),
           borderRadius: BorderRadius.circular(10)),
       child: Row(
         children: [
@@ -100,34 +100,28 @@ class HistorialScreen extends StatelessWidget {
                 Text("DETALLE DE ACTA",
                     style: TextStyle(
                         color: colorPrincipal, fontWeight: FontWeight.bold)),
-                Row(
-                  children: [
-                    // --- NUEVO BOTÓN PARA WHATSAPP ---
-                    IconButton(
-                      icon: const Icon(Icons.share, color: Colors.green),
-                      tooltip: "Compartir por WhatsApp",
-                      onPressed: () => funcionCompartirWhatsapp(d),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.print),
-                      tooltip: "Imprimir Ticket",
-                      onPressed: () => funcionImprimirTicket(d),
-                    ),
-                  ],
+                IconButton(
+                  icon: const Icon(Icons.print),
+                  tooltip: "Imprimir Ticket",
+                  onPressed: () => funcionImprimirTicket(d),
                 ),
               ],
             ),
             const Divider(),
             _infoRow("NRO ACTA", d['nro_acta']),
-            _infoRow("PATENTE", d['patente']),
-            _infoRow("DIRECCIÓN",
-                "${d['calle_ruta'] ?? 'S/D'} ${d['nro_km'] ?? ''}"),
-            _infoRow("VEHÍCULO", "${d['marca'] ?? ''} ${d['modelo'] ?? ''}"),
-            _infoRow("INFRACCIÓN", d['tipo_infraccion']),
+            const SizedBox(height: 10),
+            // --- ORDEN CORREGIDO Y CAMPOS SEPARADOS ---
             _infoRow("FECHA", d['fecha_str']),
-            _infoRow("AGENTE", d['agente_nombre']),
+            _infoRow("PATENTE", d['patente']),
+            _infoRow("MARCA", d['marca']),
+            _infoRow("MODELO", d['modelo']),
+            _infoRow("CALLE/RUTA", d['calle_ruta']),
+            _infoRow("ALTURA/KM", d['nro_km']),
+            _infoRow("LOCALIDAD", d['localidad_id']),
+            _infoRow("INFRACCIÓN", d['tipo_infraccion']),
             _infoRow("OBSERVACIONES", d['observaciones']),
-            _infoRow("COORDENADAS", d['ubicacion']),
+            _infoRow("UBICACIÓN", d['ubicacion']),
+            _infoRow("AGENTE", d['agente_nombre']),
             const SizedBox(height: 20),
             Center(
               child: TextButton(

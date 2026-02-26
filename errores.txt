@@ -1,7 +1,0 @@
-Connected devices:
-sdk gphone64 x86 64 (mobile) • emulator-5554  • android-x64 • Android 16 (API 36) (emulator)
-sdk gphone64 x86 64 (mobile) • localhost:5555 • android-x64 • Android 16 (API 36) (emulator)
-[1]: sdk gphone64 x86 64 (emulator-5554)
-[2]: sdk gphone64 x86 64 (localhost:5555)
-Please choose one (or "q" to quit): 
-Please choose one (or "q" to quit): 

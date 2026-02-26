@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
+import 'dart:async';
 import 'dart:io';
 
 import '../user_model.dart';
@@ -27,7 +28,7 @@ class _FormularioScreenState extends State<FormularioScreen> {
   final _alturaCtrl = TextEditingController();
   final _obsCtrl = TextEditingController();
 
-  // Controladores y FocusNodes específicos para los Autocomplete (CORRECCIÓN DE ERROR)
+  // Controladores y FocusNodes específicos para los Autocomplete
   final TextEditingController _autoMarcaCtrl = TextEditingController();
   final TextEditingController _autoModeloCtrl = TextEditingController();
   final FocusNode _focusMarca = FocusNode();
@@ -62,13 +63,14 @@ class _FormularioScreenState extends State<FormularioScreen> {
     _obsCtrl.dispose();
     _autoMarcaCtrl.dispose();
     _autoModeloCtrl.dispose();
-    _focusMarca.dispose(); // Importante liberar los FocusNodes
+    _focusMarca.dispose();
     _focusModelo.dispose();
     super.dispose();
   }
 
-  // Función para capturar GPS a demanda
+  // --- CORRECCIÓN: Lógica de GPS con API actualizada ---
   Future<void> _obtenerUbicacionManual() async {
+    if (!mounted) return;
     setState(() {
       _obteniendoGPS = true;
       _coordenadas = "BUSCANDO SEÑAL...";
@@ -77,8 +79,13 @@ class _FormularioScreenState extends State<FormularioScreen> {
     try {
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
-        setState(() => _coordenadas = "GPS DESACTIVADO");
-        _obteniendoGPS = false;
+        if (mounted) {
+          setState(() {
+            _coordenadas = "GPS DESACTIVADO";
+            _obteniendoGPS = false;
+          });
+          _mostrarMensaje("Por favor, active el servicio de ubicación (GPS).");
+        }
         return;
       }
 
@@ -86,27 +93,50 @@ class _FormularioScreenState extends State<FormularioScreen> {
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) {
-          setState(() => _coordenadas = "PERMISO DENEGADO");
+          if (mounted) setState(() => _coordenadas = "PERMISO DENEGADO");
           _obteniendoGPS = false;
           return;
         }
       }
+      
+      if (permission == LocationPermission.deniedForever) {
+        if (mounted) setState(() => _coordenadas = "PERMISO DENEGADO PERMANENTEMENTE");
+         _obteniendoGPS = false;
+        return;
+      }
 
-      Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-        timeLimit: const Duration(seconds: 12),
+      // Se utiliza la API recomendada con LocationSettings
+      const LocationSettings locationSettings = LocationSettings(
+        accuracy: LocationAccuracy.high,
       );
+      
+      Position position = await Geolocator.getPositionStream(locationSettings: locationSettings)
+          .first
+          .timeout(const Duration(seconds: 12));
 
-      setState(() {
-        _coordenadas = "${position.latitude}, ${position.longitude}";
-        _obteniendoGPS = false;
-      });
+      if (mounted) {
+        setState(() {
+          _coordenadas = "${position.latitude}, ${position.longitude}";
+          _obteniendoGPS = false;
+        });
+      }
+
+    } on TimeoutException {
+        if (mounted) {
+            setState(() {
+                _coordenadas = "ERROR (TIMEOUT)";
+                _obteniendoGPS = false;
+            });
+            _mostrarMensaje("No se pudo obtener la ubicación a tiempo. Intente en un lugar con mejor señal.");
+        }
     } catch (e) {
-      setState(() {
-        _coordenadas = "ERROR DE SEÑAL";
-        _obteniendoGPS = false;
-      });
-      _mostrarMensaje("ERROR: REINTENTE EN UN LUGAR ABIERTO");
+        if (mounted) {
+            setState(() {
+                _coordenadas = "ERROR DE SEÑAL";
+                _obteniendoGPS = false;
+            });
+            _mostrarMensaje("ERROR: REINTENTE EN UN LUGAR ABIERTO");
+        }
     }
   }
 
@@ -145,30 +175,29 @@ class _FormularioScreenState extends State<FormularioScreen> {
     setState(() => _cargando = true);
 
     try {
-      final docRef =
-          FirebaseFirestore.instance.collection('infracciones').doc();
+      final docRef = FirebaseFirestore.instance.collection('infracciones').doc();
       final String idActa = docRef.id;
-      final String idProyecto = widget.usuario.proyectoId.toUpperCase();
+      final String idLocalidad = widget.usuario.localidadId.toUpperCase();
       final DateTime ahora = DateTime.now().toLocal();
       final String fechaStr =
           "${ahora.day.toString().padLeft(2, '0')}/${ahora.month.toString().padLeft(2, '0')}/${ahora.year} ${ahora.hour.toString().padLeft(2, '0')}:${ahora.minute.toString().padLeft(2, '0')}";
 
-      String? urlPatente, urlContexto;
-      final String rutaBase =
-          'proyectos/${idProyecto.toLowerCase()}/infracciones/$idActa';
+      final String rutaBase = 'localidades/${idLocalidad.toLowerCase()}/infracciones/$idActa';
 
-      if (_fotoPatente != null) {
-        final ref =
-            FirebaseStorage.instance.ref().child('$rutaBase/foto_patente.jpg');
-        await ref.putFile(_fotoPatente!);
-        urlPatente = await ref.getDownloadURL();
+      Future<String?> subirImagen(File? imagen, String nombreArchivo) async {
+        if (imagen == null) return null;
+        final ref = FirebaseStorage.instance.ref().child('$rutaBase/$nombreArchivo');
+        await ref.putFile(imagen);
+        return await ref.getDownloadURL();
       }
-      if (_fotoContexto != null) {
-        final ref =
-            FirebaseStorage.instance.ref().child('$rutaBase/foto_contexto.jpg');
-        await ref.putFile(_fotoContexto!);
-        urlContexto = await ref.getDownloadURL();
-      }
+
+      final results = await Future.wait([
+        subirImagen(_fotoPatente, 'foto_patente.jpg'),
+        subirImagen(_fotoContexto, 'foto_contexto.jpg'),
+      ]);
+
+      final String? urlPatente = results[0];
+      final String? urlContexto = results[1];
 
       final datos = {
         'nro_acta': idActa.substring(0, 6).toUpperCase(),
@@ -181,7 +210,7 @@ class _FormularioScreenState extends State<FormularioScreen> {
         'observaciones': _obsCtrl.text.trim().toUpperCase(),
         'ubicacion': _coordenadas,
         'agente_nombre': widget.usuario.nombre.toUpperCase(),
-        'proyecto_id': idProyecto,
+        'localidad_id': idLocalidad,
         'agente_uid': widget.usuario.uid,
         'fecha_str': fechaStr,
         'fecha': FieldValue.serverTimestamp(),
@@ -203,6 +232,7 @@ class _FormularioScreenState extends State<FormularioScreen> {
     }
   }
 
+
   void _mostrarDialogoExito(Map<String, dynamic> d) {
     showDialog(
       context: context,
@@ -214,27 +244,15 @@ class _FormularioScreenState extends State<FormularioScreen> {
             textAlign: TextAlign.center),
         actions: [
           Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  ElevatedButton.icon(
-                    onPressed: () => funcionCompartirWhatsapp(d),
-                    icon: const Icon(Icons.share),
-                    label: const Text("WHATSAPP"),
-                    style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green,
-                        foregroundColor: Colors.white),
-                  ),
-                  ElevatedButton.icon(
-                    onPressed: () => funcionImprimirTicket(d),
-                    icon: const Icon(Icons.print),
-                    label: const Text("TICKET"),
-                    style: ElevatedButton.styleFrom(
-                        backgroundColor: colorPrincipal,
-                        foregroundColor: Colors.white),
-                  ),
-                ],
+              ElevatedButton.icon(
+                onPressed: () => funcionImprimirTicket(d),
+                icon: const Icon(Icons.print),
+                label: const Text("IMPRIMIR TICKET"),
+                style: ElevatedButton.styleFrom(
+                    backgroundColor: colorPrincipal,
+                    foregroundColor: Colors.white),
               ),
               const SizedBox(height: 10),
               TextButton(
@@ -265,6 +283,7 @@ class _FormularioScreenState extends State<FormularioScreen> {
   }
 
   void _mostrarMensaje(String m) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(m), behavior: SnackBarBehavior.floating));
   }
@@ -298,6 +317,7 @@ class _FormularioScreenState extends State<FormularioScreen> {
               ],
             ),
             const SizedBox(height: 15),
+            // --- CORRECCIÓN: Se revierte a initialValue para quitar warning ---
             DropdownButtonFormField<String>(
               initialValue: _tipoInfraccionSeleccionada,
               decoration: const InputDecoration(
@@ -356,13 +376,13 @@ class _FormularioScreenState extends State<FormularioScreen> {
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
           color: tieneCoordenadas
-              ? Colors.green.withOpacity(0.1)
-              : Colors.orange.withOpacity(0.1),
+              ? Colors.green.withAlpha(26)
+              : Colors.orange.withAlpha(26),
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
               color: tieneCoordenadas
                   ? Colors.green
-                  : Colors.orange.withOpacity(0.5))),
+                  : Colors.orange.withAlpha(128))),
       child: Row(children: [
         Icon(Icons.location_on,
             color: tieneCoordenadas ? Colors.green : Colors.orange),
@@ -392,7 +412,7 @@ class _FormularioScreenState extends State<FormularioScreen> {
       List<String> opciones) {
     return RawAutocomplete<String>(
       textEditingController: autoCtrl,
-      focusNode: focus, // CORRECCIÓN: Vinculamos el FocusNode aquí
+      focusNode: focus,
       optionsBuilder: (val) => val.text.isEmpty
           ? const Iterable<String>.empty()
           : opciones.where((o) => o.contains(val.text.toUpperCase())),
@@ -446,7 +466,7 @@ class _FormularioScreenState extends State<FormularioScreen> {
       child: Container(
         height: 100,
         decoration: BoxDecoration(
-            color: Colors.grey.withOpacity(0.2),
+            color: Colors.grey.withAlpha(51),
             borderRadius: BorderRadius.circular(10)),
         child: img == null
             ? Column(mainAxisAlignment: MainAxisAlignment.center, children: [

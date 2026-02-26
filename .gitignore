@@ -1,5 +1,6 @@
 # Miscellaneous
 *.class
+*.lock
 *.log
 *.pyc
 *.swp
@@ -14,31 +15,31 @@
 *.iml
 *.ipr
 *.iws
-.idea/
+out/
+
+# Visual Studio Code
+.vscode/
 
 # Flutter/Dart
 .dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
 .packages
 .pub-cache/
 .pub/
 /build/
-*.app
-*.apk
-*.aab
-*.ipa
-*.zip
 
-# Firebase
-/ios/Pods/
-/ios/Firebase/
-/android/app/google-services.json
+# Android
+.gradle/
+local.properties
 
-# Build results
-/build/
-/ios/build/
-/android/build/
-/web/build/
+# iOS
+.ios/
+DerivedData/
+Runner.xcworkspace/
 
-# Other
+# Web
+.dart_tool/build/web/
+
+# Build artefacts
 app.zip
-errores.txt
