@@ -7,9 +7,9 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:187542294045:android:68c035e7b7a037e39880f4",
+        "mobilesdk_app_id": "1:187542294045:android:046b05a6fe19b7bc9880f4",
         "android_client_info": {
-          "package_name": "com.example.myapp"
+          "package_name": "com.infracciones.app"
         }
       },
       "oauth_client": [],

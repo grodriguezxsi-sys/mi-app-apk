@@ -9,7 +9,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.myapp"
+    namespace = "com.infracciones.app"
     compileSdk = 36 // Versión actualizada para 2026
     ndkVersion = flutter.ndkVersion
 
@@ -24,7 +24,7 @@ android {
 
     defaultConfig {
         // IMPORTANTE: Este ID debe coincidir con el de tu consola de Firebase
-        applicationId = "com.example.myapp"
+        applicationId = "com.infracciones.app"
         
         // CONFIGURACIÓN PARA FIREBASE Y GPS:
         minSdk = flutter.minSdkVersion    // Requerido para estabilidad de Firebase y Geolocator
