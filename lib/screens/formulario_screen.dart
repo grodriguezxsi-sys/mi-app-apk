@@ -31,6 +31,7 @@ class _FormularioScreenState extends State<FormularioScreen> {
   // Controladores y FocusNodes específicos para los Autocomplete
   final TextEditingController _autoMarcaCtrl = TextEditingController();
   final TextEditingController _autoModeloCtrl = TextEditingController();
+  final FocusNode _focusPatente = FocusNode();
   final FocusNode _focusMarca = FocusNode();
   final FocusNode _focusModelo = FocusNode();
 
@@ -42,6 +43,7 @@ class _FormularioScreenState extends State<FormularioScreen> {
   String _coordenadas = "SIN CAPTURAR";
   bool _obteniendoGPS = false;
   bool _cargando = false;
+  final ValueNotifier<String> _mensajeDeCarga = ValueNotifier("");
 
   final List<String> _opcionesInfraccion = [
     "MAL ESTACIONADO",
@@ -63,8 +65,10 @@ class _FormularioScreenState extends State<FormularioScreen> {
     _obsCtrl.dispose();
     _autoMarcaCtrl.dispose();
     _autoModeloCtrl.dispose();
+    _focusPatente.dispose();
     _focusMarca.dispose();
     _focusModelo.dispose();
+    _mensajeDeCarga.dispose();
     super.dispose();
   }
 
@@ -173,6 +177,8 @@ class _FormularioScreenState extends State<FormularioScreen> {
     }
 
     setState(() => _cargando = true);
+    _mensajeDeCarga.value = "Iniciando proceso...";
+    await Future.delayed(Duration.zero);
 
     try {
       final docRef = FirebaseFirestore.instance.collection('infracciones').doc();
@@ -184,20 +190,18 @@ class _FormularioScreenState extends State<FormularioScreen> {
 
       final String rutaBase = 'localidades/${idLocalidad.toLowerCase()}/infracciones/$idActa';
 
-      Future<String?> subirImagen(File? imagen, String nombreArchivo) async {
-        if (imagen == null) return null;
-        final ref = FirebaseStorage.instance.ref().child('$rutaBase/$nombreArchivo');
-        await ref.putFile(imagen);
-        return await ref.getDownloadURL();
+      // Subir foto de patente
+      _mensajeDeCarga.value = "Subiendo foto de patente...";
+      await Future.delayed(Duration.zero);
+      final String? urlPatente = await _subirImagen(_fotoPatente, '$rutaBase/foto_patente.jpg');
+
+      // Subir foto de contexto
+      String? urlContexto;
+      if (_fotoContexto != null) {
+        _mensajeDeCarga.value = "Subiendo foto de contexto...";
+        await Future.delayed(Duration.zero);
+        urlContexto = await _subirImagen(_fotoContexto, '$rutaBase/foto_contexto.jpg');
       }
-
-      final results = await Future.wait([
-        subirImagen(_fotoPatente, 'foto_patente.jpg'),
-        subirImagen(_fotoContexto, 'foto_contexto.jpg'),
-      ]);
-
-      final String? urlPatente = results[0];
-      final String? urlContexto = results[1];
 
       final datos = {
         'nro_acta': idActa.substring(0, 6).toUpperCase(),
@@ -219,6 +223,8 @@ class _FormularioScreenState extends State<FormularioScreen> {
         'estado_ftp': 'PENDIENTE',
       };
 
+      _mensajeDeCarga.value = "Registrando infracción...";
+      await Future.delayed(Duration.zero);
       await docRef.set(datos);
 
       if (mounted) {
@@ -228,8 +234,17 @@ class _FormularioScreenState extends State<FormularioScreen> {
     } catch (e) {
       _mostrarMensaje("ERROR: $e");
     } finally {
-      if (mounted) setState(() => _cargando = false);
+      if (mounted) {
+        setState(() => _cargando = false);
+      }
     }
+  }
+
+  Future<String?> _subirImagen(File? imagen, String path) async {
+    if (imagen == null) return null;
+    final ref = FirebaseStorage.instance.ref().child(path);
+    await ref.putFile(imagen);
+    return await ref.getDownloadURL();
   }
 
 
@@ -280,6 +295,7 @@ class _FormularioScreenState extends State<FormularioScreen> {
       _tipoInfraccionSeleccionada = null;
       _coordenadas = "SIN CAPTURAR";
     });
+    _focusPatente.requestFocus();
   }
 
   void _mostrarMensaje(String m) {
@@ -296,7 +312,7 @@ class _FormularioScreenState extends State<FormularioScreen> {
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
-            _buildInput(_patenteCtrl, "PATENTE / DOMINIO", Icons.badge),
+            _buildInput(_patenteCtrl, "PATENTE / DOMINIO", Icons.badge, focusNode: _focusPatente),
             const SizedBox(height: 15),
             _buildAutocomplete(_marcaCtrl, _autoMarcaCtrl, _focusMarca, "MARCA",
                 Icons.directions_car, ListasAutocompletado.marcas),
@@ -352,7 +368,18 @@ class _FormularioScreenState extends State<FormularioScreen> {
             ),
             const SizedBox(height: 25),
             _cargando
-                ? const CircularProgressIndicator(color: colorPrincipal)
+                ? ValueListenableBuilder<String>(
+                    valueListenable: _mensajeDeCarga,
+                    builder: (context, mensaje, child) {
+                      return Column(
+                        children: [
+                          CircularProgressIndicator(color: colorPrincipal),
+                          SizedBox(height: 15),
+                          Text(mensaje, style: TextStyle(color: colorPrincipal, fontWeight: FontWeight.bold)),
+                        ],
+                      );
+                    },
+                  )
                 : ElevatedButton(
                     onPressed: _guardar,
                     style: ElevatedButton.styleFrom(
@@ -448,9 +475,10 @@ class _FormularioScreenState extends State<FormularioScreen> {
   }
 
   Widget _buildInput(TextEditingController ctrl, String label, IconData icon,
-      {int maxLines = 1}) {
+      {int maxLines = 1, FocusNode? focusNode}) {
     return TextField(
       controller: ctrl,
+      focusNode: focusNode,
       maxLines: maxLines,
       inputFormatters: [UpperCaseTextFormatter()],
       decoration: InputDecoration(
