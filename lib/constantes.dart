@@ -66,7 +66,7 @@ class ListasAutocompletado {
     "KWID", "MASTER", "CLIO",
     // CHEVROLET
     "ONIX", "PRISMA", "TRACKER", "CRUZE", "S10", "EQUINOX", "JOY", "SPIN",
-    "MONTANA", "CORSA",
+    "MONTANA", "CORSA", "CELTA",
     // PEUGEOT
     "208", "2008", "3008", "308", "408", "PARTNER", "EXPERT", "BOXER",
     // CITROEN
