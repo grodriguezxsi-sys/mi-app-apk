@@ -10,45 +10,35 @@ plugins {
 
 android {
     namespace = "com.infracciones.app"
-    compileSdk = 36 // Versión actualizada para 2026
+    compileSdk = 36 
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        sourceCompatibility = JavaVersion.VERSION_1_8
+        targetCompatibility = JavaVersion.VERSION_1_8
     }
 
     kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_11.toString()
+        jvmTarget = "1.8"
     }
 
     defaultConfig {
-        // IMPORTANTE: Este ID debe coincidir con el de tu consola de Firebase
         applicationId = "com.infracciones.app"
-        
-        // CONFIGURACIÓN PARA FIREBASE Y GPS:
-        minSdk = flutter.minSdkVersion    // Requerido para estabilidad de Firebase y Geolocator
-        targetSdk = 36 // Requerido por Google Play en 2026
-        
+        minSdk = flutter.minSdkVersion
+        targetSdk = 36
         versionCode = flutter.versionCode
         versionName = flutter.versionName
-
-        // ACTIVACIÓN DE MULTIDEX: Necesario para apps con muchas librerías (Firebase)
         multiDexEnabled = true
     }
 
     buildTypes {
         release {
-            // Usamos la firma de debug para esta prueba rápida del APK
             signingConfig = signingConfigs.getByName("debug")
-            
-            // Optimizaciones de salida
             isMinifyEnabled = false
             isShrinkResources = false
         }
     }
 
-    // --- BLOQUE AGREGADO PARA CAMBIAR EL NOMBRE DEL APK ---
     applicationVariants.all {
         val variant = this
         variant.outputs.all {
@@ -63,6 +53,5 @@ flutter {
 }
 
 dependencies {
-    // Librería necesaria para soportar multiDexEnabled
     implementation("androidx.multidex:multidex:2.0.1")
 }
